@@ -1,8 +1,42 @@
+import path from 'path';
+import 'dotenv/config'
+import {readFile} from 'fs/promises';
+import SignalingServer from './signalingServer';
+import {ServerOptions, WebSocketServer} from 'ws';
 import http, {IncomingMessage, ServerResponse} from 'http';
-const SERVER_PORT: number = 3000;
+import { WebSocketService } from './webSocketService';
+import { DataStreamServer } from './streamServer';
 
-function requestHandler(resquest : IncomingMessage, response : ServerResponse): void {
-    response.end('Hello from Typescript');
+const HTTP_SERVER_PORT: number = 3000;
+const WS_SIGNALING_SERVER_PORT: number = 5000;
+const WS_STREAM_SERVER_PORT: number = 5001;
+
+
+async function requestHandler(request: IncomingMessage, response: ServerResponse) {
+    try {
+        const baseFile: string = path.basename(request.url || '') || 'index.html'
+        const pagePath: string = path.join(process.cwd(), 'src', 'public', baseFile)
+        const file: Buffer = await readFile(pagePath);
+        response.end(file)
+    } catch (error) {
+        console.log(error)
+    }
 }
 
-http.createServer(requestHandler).listen(SERVER_PORT,  () => console.log(`server listening o port ${SERVER_PORT}`))
+http.createServer(requestHandler).listen(HTTP_SERVER_PORT, () => console.log(`server listening o port ${HTTP_SERVER_PORT}`))
+
+const signalingWSConfiguration: ServerOptions = {
+    port: WS_SIGNALING_SERVER_PORT
+}
+
+
+const dataStreamWSConfiguration: ServerOptions = {
+    port: WS_STREAM_SERVER_PORT
+}
+
+
+const signalingWSServer = new WebSocketService(signalingWSConfiguration)
+const dataStreamWSServer = new WebSocketService(dataStreamWSConfiguration)
+const rtcServer = new SignalingServer(signalingWSServer)
+const dataStreamServer = new DataStreamServer(dataStreamWSServer)
+
