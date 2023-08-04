@@ -1,11 +1,10 @@
-
 const DATA_STREAM_WS_URL = 'ws://192.168.0.37:5001'
 const SIGNALING_WS_URL = 'ws://192.168.0.37:5000'
 
 let localStream;
 let remoteStream;
 let peerConnection;
-let signalingSocket = new WebSocket(SIGNALING_WS_URL);
+let signalingService = new SignalingService(SIGNALING_WS_URL)
 let dataStreamSocket = new WebSocket(DATA_STREAM_WS_URL);
 
 const localVideo = document.getElementById('localVideo');
@@ -19,24 +18,13 @@ const iceServers = [
 
 const constraints = {
   video: true,
-  audio: true
-};
-
-signalingSocket.onopen = (event) => {
-    console.log('Connection is open:', event)
-};
-signalingSocket.onclose = (event) => {
-  console.log('Connection is closed:', event)
-
-};
-signalingSocket.onmessage = (event) => {
-  console.log('Message received:', event)
+  audio: false
 };
 
 async function startCall() {
   try {
+    signalingService.joinChat()
     localStream = await navigator.mediaDevices.getUserMedia(constraints);
-    // Mostrar o vídeo local na página
     localVideo.srcObject = localStream;
 
     setInterval(() => {
@@ -46,7 +34,7 @@ async function startCall() {
       const context = canvas.getContext('2d');
       context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
       const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
-      sendFrameForModeration(imageData);
+      // sendFrameForModeration(imageData);
     }, 3000);
 
     // Configurar a conexão Peer
@@ -76,6 +64,7 @@ async function startCall() {
 
   } catch (error) {
     console.error('Error accessing media devices: ', error);
+    alert(error)
   }
 }
 

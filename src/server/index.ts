@@ -2,7 +2,7 @@ import path from 'path';
 import 'dotenv/config'
 import {readFile} from 'fs/promises';
 import SignalingServer from './signalingServer';
-import {ServerOptions, WebSocketServer} from 'ws';
+import {ServerOptions } from 'ws';
 import http, {IncomingMessage, ServerResponse} from 'http';
 import { WebSocketService } from './webSocketService';
 import { DataStreamServer } from './streamServer';
@@ -14,7 +14,8 @@ const WS_STREAM_SERVER_PORT: number = 5001;
 
 async function requestHandler(request: IncomingMessage, response: ServerResponse) {
     try {
-        const baseFile: string = path.basename(request.url || '') || 'index.html'
+        let baseFile: string = path.basename(request.url || '') || 'index.html'
+        baseFile = path.extname(baseFile) === '.js' ? `js/${baseFile}` : baseFile
         const pagePath: string = path.join(process.cwd(), 'src', 'public', baseFile)
         const file: Buffer = await readFile(pagePath);
         response.end(file)
@@ -36,7 +37,7 @@ const dataStreamWSConfiguration: ServerOptions = {
 
 
 const signalingWSServer = new WebSocketService(signalingWSConfiguration)
-const dataStreamWSServer = new WebSocketService(dataStreamWSConfiguration)
+// const dataStreamWSServer = new WebSocketService(dataStreamWSConfiguration)
 const rtcServer = new SignalingServer(signalingWSServer)
-const dataStreamServer = new DataStreamServer(dataStreamWSServer)
+// const dataStreamServer = new DataStreamServer(dataStreamWSServer)
 

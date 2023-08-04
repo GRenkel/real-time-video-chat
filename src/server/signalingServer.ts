@@ -1,24 +1,32 @@
-import {Message, WebSocketService} from './webSocketService';
+import {ReceivedMessage, SendingMessage, WebSocketService} from './webSocketService';
 
+type Rooms = Map<string, Set<string>>
 class SignalingServer {
-
+    
+    private activeRooms : Rooms
+    
     constructor(private wsService : WebSocketService) {
-
+        this.activeRooms = new Map()
         wsService.on('connection-open', (data : any) => {
-            this.handleConnection(data.connectionIdentifier);
+            console.log('Connection established on signaling server: ', data.connectionIdentifier);
         });
+        this.handleConnection();
     }
 
-    sendSignalization(userIdentifier : string, message : Message) { // connection.send(JSON.stringify(message));
-        this.wsService.sendMessage(userIdentifier, message)
+    sendSignal(memberIdentifiers : Set<string>, message : SendingMessage) {
+        console.log('Sending message on signaling server...', message);
+        this.wsService.sendMessages(memberIdentifiers, message)
     }
 
 
-    async processHandShake(message : Message) {
+    async processSignalization(message : ReceivedMessage) {
         console.log('Incoming message on signaling server...', message);
         switch (message.type) {
+            case 'join':
+                await this.joinChatRoom(message)
+                break
             case 'offer':
-                await this.handleOffer();
+                await this.handleOffer(message);
                 break;
             case 'answer':
                 await this.handleAnswer();
@@ -31,29 +39,63 @@ class SignalingServer {
         }
     }
 
-    handleClosedConnection(userIdentifier : string) {
+    handleClosedConnection(memberIdentifier : string) {
         console.log('Conexão encerrada.');
-        // this.connections.delete(userIdentifier);
+        // this.activeRooms.delete(memberIdentifier);
     }
 
-    async handleOffer() {}
+    async callRoomMembers(message : ReceivedMessage){
+        const memberIdentifier = message.identifier
+        const targetRoom = message.target
+        
+        let targetMembers : Set<string> = new Set()
+        const roomMembers : Set<string> = this.activeRooms.get(targetRoom) || new Set();
+
+        roomMembers.forEach(member => memberIdentifier !== member && targetMembers.add(member))
+        
+        const callMessage : SendingMessage = {
+            data: 'hi there',
+            type: 'call'
+        }
+        console.log(`member ${memberIdentifier} calling: `, targetMembers)
+        this.sendSignal(targetMembers, callMessage)
+
+    }
+
+    async joinChatRoom(message: ReceivedMessage){
+        const memberIdentifier = message.identifier
+        const targetRoom = message.target
+
+        let roomMembers : Set<string> = this.activeRooms.get(targetRoom) || new Set();
+        roomMembers.add(memberIdentifier)
+        this.activeRooms.set(targetRoom, roomMembers)
+
+        console.log(`member ${memberIdentifier} joining rom ${targetRoom} with current members: `, roomMembers)
+        console.log('current active roms: ', this.activeRooms)
+        await this.callRoomMembers(message)
+    }
+    
+    // createOffer(memberIdentifiers: Set<string>){
+    //     memberIdentifiers.forEach(member => {
+    //         const offer : SendingMessage = {
+    //             type: 'offer',
+    //             data: 'teste',
+    //             target: memberIdentifiers
+    //         }
+    //     })
+    // }
+
+    async handleOffer(message : ReceivedMessage) {
+        console.log('Offer received', message)
+    }
 
     async handleAnswer() {}
 
     async handleCandidate() {}
 
-    handleConnection(userIdentifier : string) {
-        console.log('Connection established on signaling server: ', userIdentifier);
-        // this.connections.add(userIdentifier);
-
-        this.sendSignalization(userIdentifier, {
-            type: 'self-identifier',
-            target: userIdentifier,
-            data: userIdentifier
-        });
-
-        this.wsService.on('message', this.processHandShake.bind(this));
-        this.wsService.on('connection-closed', () => this.handleClosedConnection(userIdentifier));
+    handleConnection() {
+        this.wsService.on('message-received', (message: ReceivedMessage) => this.processSignalization(message));
+        this.wsService.on('connection-closed', (memberIdentifier) => this.handleClosedConnection(memberIdentifier));
     }
 }
 

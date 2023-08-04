@@ -1,6 +1,6 @@
 import {RekognitionService, RekognitionServiceType} from "../apis/awsRekognition";
 import { FrameInspector } from "./frameInspector";
-import { Message, WebSocketService } from "./webSocketService";
+import { ReceivedMessage, SendingMessage, WebSocketService } from "./webSocketService";
 
 
 export class DataStreamServer {
@@ -18,9 +18,9 @@ export class DataStreamServer {
         });
     }
 
-    sendWSMessage(userIdentifier : string, message : Message) { // connection.send(JSON.stringify(message));
-        this.wsService.sendMessage(userIdentifier, message)
-    }
+    // sendWSMessage(userIdentifier : string, message : SendingMessage) { // connection.send(JSON.stringify(message));
+    //     this.wsService.sendMessages(userIdentifier, message)
+    // }
 
 
     handleClosedConnection(userIdentifier : string) {
@@ -32,17 +32,17 @@ export class DataStreamServer {
         console.log('Connection established on signaling server: ', userIdentifier);
         this.connections.add(userIdentifier);
 
-        this.sendWSMessage(userIdentifier, {
-            type: 'self-identifier',
-            target: userIdentifier,
-            data: userIdentifier
-        });
+        // this.sendWSMessage(userIdentifier, {
+        //     type: 'self-identifier',
+        //     target: userIdentifier,
+        //     data: userIdentifier
+        // });
 
         this.wsService.on('message', this.processDataStream.bind(this));
         this.wsService.on('connection-closed', () => this.handleClosedConnection(userIdentifier));
     }
 
-    async processDataStream(message : Message) {
+    async processDataStream(message : ReceivedMessage) {
         try {
             const frameString : string = message.data
             console.log('Frame: ', frameString)

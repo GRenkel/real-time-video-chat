@@ -1,78 +1,104 @@
-import {Server, ServerOptions, WebSocket, WebSocketServer} from "ws";
-import { IncomingMessage } from "http";
+import {
+    RawData,
+    Server,
+    ServerOptions,
+    WebSocket,
+    WebSocketServer
+} from "ws";
 import EventEmitter from "events";
 
-export interface Message {
+export interface SendingMessage {
     type: string;
-    target: string;
     data: string;
 }
 
-export class WebSocketService extends EventEmitter {
-    
-    private wsServer: Server;
-    private connections : Map < string, WebSocket >;
+export interface ReceivedMessage {
+    type: string;
+    data: string;
+    identifier: string | '';
+    target: string
+}
 
-    constructor( wsConfig : ServerOptions) {
+export interface IdentifiedConnection {
+    socket: WebSocket,
+    id: string
+}
+
+export class WebSocketService extends EventEmitter {
+
+    private wsServer : Server;
+    private connections : Map < string,
+    IdentifiedConnection >;
+
+    constructor(wsConfig : ServerOptions) {
         super()
         this.connections = new Map();
         this.wsServer = new WebSocketServer(wsConfig)
-        this.wsServer.on('connection', (connection : WebSocket, request : IncomingMessage) => {
-            this.handleConnection(connection, request);
+        this.wsServer.on('connection', (connection : WebSocket) => {
+            this.handleConnection(connection);
         });
         console.info('Web Socket started on: ', wsConfig.port)
     }
 
-    emitEvent(name: string, data: object){
+    emitSocketEvent(name : string, data : object) {
+        console.log('################ WS EMITING EVENT #################')
+
+        console.log(`EVENT[${name}]: data`)
         this.emit(name, data)
     }
 
-    async handleIncomingMessages(message : string) {
-        const parsedMessage: Message = JSON.parse(message);
-        console.log('WebSocket received: ', parsedMessage )
-        this.emitEvent('message', parsedMessage)
+    async handleIncomingMessages(message : RawData, connection : IdentifiedConnection) {
+        console.log('################ WS INCOMING MESSAGE #################')
+        const parsedMessage: ReceivedMessage = JSON.parse(message.toString());
+        parsedMessage.identifier = connection.id
+        // console.log('WebSocket received: ', parsedMessage)
+        this.emitSocketEvent('message-received', parsedMessage)
     }
 
-    handleConnection(connection : WebSocket, request : IncomingMessage) {
+    getUniqueIdentifier(): string {
+        function s4() {
+            return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+        }
+        return s4() + s4() + '-' + s4();
+    }
 
-        const userIP = request.socket.remoteAddress || ''
-        this.connections.set(userIP, connection);
+    handleConnection(connection : WebSocket) {
+        const connectionIdentifier = this.getUniqueIdentifier()
 
-        this.sendMessage(userIP, {
-            type: 'self-identifier',
-            target: userIP,
-            data: userIP
-        });
+        let identifiedConnection: IdentifiedConnection = {
+            socket: connection,
+            id: connectionIdentifier
+        }
 
-        this.emitEvent('connection-open', {connectionIdentifier: userIP})
-        connection.on('message', this.handleIncomingMessages.bind(this));
-        connection.on('close', () => this.handleClosedConnection(userIP));
-        
+        this.connections.set(connectionIdentifier, identifiedConnection);
+        this.emitSocketEvent('connection-open', {connectionIdentifier})
+        connection.on('message', (message : RawData) => this.handleIncomingMessages(message, identifiedConnection));
+        connection.on('close', () => this.handleClosedConnection(connectionIdentifier));
+
     }
 
     handleClosedConnection(connectionIdentifier : string) {
         console.log('Conexão encerrada.');
         this.connections.delete(connectionIdentifier);
-        this.emitEvent('connection-closed', {connectionIdentifier})
+        this.emitSocketEvent('connection-closed', {connectionIdentifier})
     }
 
-        
-    sendMessage(connectionIdentifier : string, message : Message) {
-        const connection = this.getConnection(connectionIdentifier);
-        if(connection){
-            connection.send(JSON.stringify(message));
-        }
+
+    sendMessages(connectionIdentifiers : Set < string >, message : SendingMessage) {
+        const targetConnections = this.getConnections(connectionIdentifiers);
+        targetConnections.forEach(connection => {
+            connection.socket.send(JSON.stringify(message))
+        })
     }
 
-    getConnection(connectionIdentifier : string){
-        return this.connections.get(connectionIdentifier)
+    getConnections(connectionIdentifiers : Set < string >): IdentifiedConnection[]{
+        let targetConnections: IdentifiedConnection[] = [];
+        connectionIdentifiers.forEach(id => {
+            const targetConnection: IdentifiedConnection |undefined = this.connections.get(id)
+            if (targetConnection !== undefined) {
+                targetConnections.push(targetConnection)
+            }
+        });
+        return targetConnections
     }
-
-    // broadcast(message : Message) {
-    //     this.connections.forEach((connection) => {
-    //         this.sendTo(connection, message);
-    //     });
-    // }
-
 }
-
