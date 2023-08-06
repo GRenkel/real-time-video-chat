@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "eslint .",
     "start": "nodemon",
-    "build": "tsc",
+    "compile":"node ./node_modules/typescript/bin/tsc -p ./src/client",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

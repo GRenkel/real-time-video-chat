@@ -1,4 +1,4 @@
-import {ReceivedMessage, SendingMessage, WebSocketService} from './webSocketService';
+import {ReceivedMessage, Message, WebSocketService} from './webSocketService';
 
 type Rooms = Map<string, Set<string>>
 class SignalingServer {
@@ -13,7 +13,7 @@ class SignalingServer {
         this.handleConnection();
     }
 
-    sendSignal(memberIdentifiers : Set<string>, message : SendingMessage) {
+    sendSignal(memberIdentifiers : Set<string>, message : Message) {
         console.log('Sending message on signaling server...', message);
         this.wsService.sendMessages(memberIdentifiers, message)
     }
@@ -29,7 +29,7 @@ class SignalingServer {
                 await this.handleOffer(message);
                 break;
             case 'answer':
-                await this.handleAnswer();
+                await this.handleAnswer(message);
                 break;
             case 'ice_candidate':
                 await this.handleCandidate();
@@ -44,16 +44,20 @@ class SignalingServer {
         // this.activeRooms.delete(memberIdentifier);
     }
 
+    getTargetMembers(memberIdentifier:string, targetRoom: string) : Set<string>{
+        let targetMembers : Set<string> = new Set()
+        const roomMembers : Set<string> = this.activeRooms.get(targetRoom) || new Set();
+        roomMembers.forEach(member => memberIdentifier !== member && targetMembers.add(member))
+        return targetMembers
+    }
+
     async callRoomMembers(message : ReceivedMessage){
         const memberIdentifier = message.identifier
         const targetRoom = message.target
-        
-        let targetMembers : Set<string> = new Set()
-        const roomMembers : Set<string> = this.activeRooms.get(targetRoom) || new Set();
 
-        roomMembers.forEach(member => memberIdentifier !== member && targetMembers.add(member))
+        const targetMembers = this.getTargetMembers(memberIdentifier, targetRoom)
         
-        const callMessage : SendingMessage = {
+        const callMessage : Message = {
             data: 'hi there',
             type: 'call'
         }
@@ -75,21 +79,23 @@ class SignalingServer {
         await this.callRoomMembers(message)
     }
     
-    // createOffer(memberIdentifiers: Set<string>){
-    //     memberIdentifiers.forEach(member => {
-    //         const offer : SendingMessage = {
-    //             type: 'offer',
-    //             data: 'teste',
-    //             target: memberIdentifiers
-    //         }
-    //     })
-    // }
+    broadcastOffers(memberIdentifiers: Set<string>){
+        const offerBroadcastMessage : Message = {
+            data: 'do you accept?',
+            type: 'offer'
+        }
+        this.sendSignal(memberIdentifiers, offerBroadcastMessage)
+    }
 
     async handleOffer(message : ReceivedMessage) {
         console.log('Offer received', message)
+        const memberIdentifier = message.identifier
+        const targetRoom = message.target
+        const targetMembers = this.getTargetMembers(memberIdentifier, targetRoom);
+        this.broadcastOffers(targetMembers)
     }
 
-    async handleAnswer() {}
+    async handleAnswer(answer: ReceivedMessage) {}
 
     async handleCandidate() {}
 

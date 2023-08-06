@@ -1,5 +1,5 @@
 {
     "watch": ["src"],
     "ext": "ts",
-    "exec": "ts-node ./src/server/index.ts"
+    "exec": "npm run compile && ts-node ./src/server/index.ts"
 }

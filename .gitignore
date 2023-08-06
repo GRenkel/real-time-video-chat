@@ -1,2 +1,6 @@
 **/.vscode
 **/node_modules
+**/video-frames
+src/dist/public/js
+.env
+package-lock.json

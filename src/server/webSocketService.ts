@@ -7,19 +7,17 @@ import {
 } from "ws";
 import EventEmitter from "events";
 
-export interface SendingMessage {
+export type Message = {
     type: string;
     data: string;
 }
 
-export interface ReceivedMessage {
-    type: string;
-    data: string;
+export type ReceivedMessage = Message & {
     identifier: string | '';
     target: string
 }
 
-export interface IdentifiedConnection {
+export type IdentifiedConnection = {
     socket: WebSocket,
     id: string
 }
@@ -84,7 +82,7 @@ export class WebSocketService extends EventEmitter {
     }
 
 
-    sendMessages(connectionIdentifiers : Set < string >, message : SendingMessage) {
+    sendMessages(connectionIdentifiers : Set < string >, message : Message) {
         const targetConnections = this.getConnections(connectionIdentifiers);
         targetConnections.forEach(connection => {
             connection.socket.send(JSON.stringify(message))

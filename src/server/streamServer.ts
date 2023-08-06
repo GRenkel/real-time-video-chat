@@ -1,6 +1,6 @@
 import {RekognitionService, RekognitionServiceType} from "../apis/awsRekognition";
 import { FrameInspector } from "./frameInspector";
-import { ReceivedMessage, SendingMessage, WebSocketService } from "./webSocketService";
+import { ReceivedMessage, Message, WebSocketService } from "./webSocketService";
 
 
 export class DataStreamServer {
