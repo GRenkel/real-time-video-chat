@@ -1,6 +1,7 @@
 import {ReceivedMessage, Message, WebSocketService} from './webSocketService';
 
 type Rooms = Map<string, Set<string>>
+
 class SignalingServer {
     
     private activeRooms : Rooms

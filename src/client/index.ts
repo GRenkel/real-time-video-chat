@@ -1,10 +1,14 @@
+import { Room } from "./room";
+import { SignalingClient } from "./signalingClient";
+
 const DATA_STREAM_WS_URL = 'ws://192.168.0.37:5001'
 const SIGNALING_WS_URL = 'ws://192.168.0.37:5000'
 
 let localStream: MediaStream;
 let remoteStream: MediaStream;
 let peerConnection: RTCPeerConnection;
-let signalingService = new SignalingService(SIGNALING_WS_URL)
+let signalingService = new SignalingClient(SIGNALING_WS_URL)
+let chatRoom = new Room(signalingService)
 let dataStreamSocket = new WebSocket(DATA_STREAM_WS_URL);
 
 const localVideo: HTMLVideoElement = document.getElementById('localVideo') as HTMLVideoElement;
@@ -23,7 +27,7 @@ const constraints = {
 
 async function startCall() {
   try {
-    signalingService.joinChat()
+    chatRoom.joinRoom()
     localStream = await navigator.mediaDevices.getUserMedia(constraints);
     localVideo.srcObject = localStream;
 

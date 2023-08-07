@@ -1,13 +1,9 @@
 {
     "compilerOptions": {
-            "target": "es5",
+            "target": "ES2022",
             "outDir": "../dist/public/js",
             "sourceMap": true,
             "rootDir": "."
         },
-        "files": [
-            "index.ts",
-            "signalingClient.ts",
-            "peerService.ts"
-        ]
+        "include": ["./*.ts"]
   }

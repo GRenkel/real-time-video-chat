@@ -1,17 +1,16 @@
-// Variáveis globais para armazenar a conexão Peer e streams de vídeo
-// const SIGNALING_WS_URL = 'ws://192.168.0.37:5000'
-let peerConnection1;
+import { EventEmitter } from "events";
 
-type Message = {
+
+export type Message = {
     type: string;
     data: string;
 }
 
-class SignalingService {
+export class SignalingClient extends EventEmitter {
     private signalingSocket : WebSocket;
-    private peerConnections : RTCPeerConnection[] = []
 
     constructor(serverURL: string, private roomIdentifier = 'chat-test') {
+        super()
         this.signalingSocket = new WebSocket(serverURL)
         this.roomIdentifier = roomIdentifier
         this.configConnection()
@@ -21,33 +20,45 @@ class SignalingService {
         this.signalingSocket.onopen = this.onOpenConnection.bind(this)
         this.signalingSocket.onclose = this.onEndConnection.bind(this)
         this.signalingSocket.onmessage = this.onMessage.bind(this)
-
     }
 
-    joinChat() { // new class
-        const rtcConfiguration = {
-            iceServers: [
-                {
-                    urls: 'stun:stun.l.google.com:19302'
-                }
-            ]
-        }
-        let peer = new RTCPeerConnection(rtcConfiguration)
-        this.peerConnections.push(peer)
+    startConnection() { // new class
         this.sendMessage({data: 'sending a join', type: 'join'})
     }
 
-    onReceiveCall(message : Message) {
-        console.log('call received: ', message)
-        this.createOffer(message)
+    emitEvent(name : string, data : object) {
+        console.log('################ Signaling Client Event ################')
+        console.log(`EVENT[${name}]: data`)
+        this.emit(name, data)
     }
 
-    createOffer(message : Message) {
+    onReceiveCall(message : Message) {
+        //many calls
+        console.log('call received: ', message)
+        this.emitEvent('call', message)
+    }
+
+    sendOffer(message : Message) {
+        //one peer
+        //create a local description
         this.sendMessage({data: 'offer', type: 'offer'})
     }
 
-    answerOffer(message: Message) {
+    sendAnswer(message: Message) {
+        //many offers
+        //create a remote description
+        //create a local description
+        //emit answer
         console.log('offer received: ', message)
+    }
+    
+    onHandleAnswer(message: Message){
+        //create a remote description
+        console.log('Answer received: ', message)
+    }
+
+    onHandleIceCandidate(message: Message){
+        console.log('Ice candidate received', message)
     }
 
     onOpenConnection(event : Event) {
@@ -64,13 +75,13 @@ class SignalingService {
                 this.onReceiveCall(message)
                 break
             case 'offer':
-                this.answerOffer(message)
+                this.sendAnswer(message)
                 break
             case 'answer':
-                console.log('answer')
+                this.onHandleAnswer(message)
                 break
             case 'ice_candidate':
-                console.log('ice_candidate')
+                this.onHandleIceCandidate(message)
                 break;
         }
     }

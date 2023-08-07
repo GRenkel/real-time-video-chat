@@ -15,7 +15,8 @@ const WS_STREAM_SERVER_PORT: number = 5001;
 async function requestHandler(request: IncomingMessage, response: ServerResponse) {
     try {
         let baseFile: string = path.basename(request.url || '') || 'index.html'
-        baseFile = path.extname(baseFile) === '.js' ? `js/${baseFile}` : baseFile
+        const isScript = path.extname(baseFile) === '.js' || path.extname(baseFile) === '.map'
+        baseFile = isScript ? `js/${baseFile}` : baseFile
         const pagePath: string = path.join(process.cwd(), 'src', 'dist', 'public', baseFile)
         const file: Buffer = await readFile(pagePath);
         response.end(file)
