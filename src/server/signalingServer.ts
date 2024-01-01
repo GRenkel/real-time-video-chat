@@ -1,109 +1,150 @@
-import {ReceivedMessage, Message, WebSocketService} from './webSocketService';
+import { ReceivedMessage, Message, WebSocketService } from "./webSocketService";
+/* eslint-disable */
 
-type Rooms = Map<string, Set<string>>
+type Rooms = Map<string, Set<string>>;
 
 class SignalingServer {
-    
-    private activeRooms : Rooms
-    
-    constructor(private wsService : WebSocketService) {
-        this.activeRooms = new Map()
-        wsService.on('connection-open', (data : any) => {
-            console.log('Connection established on signaling server: ', data.connectionIdentifier);
-        });
-        this.handleConnection();
+  private activeRooms: Rooms;
+
+  constructor(private wsService: WebSocketService) {
+    this.activeRooms = new Map();
+    wsService.on("connection-open", (data: any) => {
+      console.log(
+        "Connection established on signaling server: ",
+        data.connectionIdentifier
+      );
+    });
+    this.handleConnection();
+  }
+
+  sendMessage(memberIdentifiers: Set<string>, message: Message) {
+    console.log("Sending message on signaling server...", message);
+    this.wsService.sendMessages(memberIdentifiers, message);
+  }
+
+  async processSignalization(message: ReceivedMessage) {
+    console.log("Incoming message on signaling server...", message);
+    switch (message.type) {
+      case "join":
+        await this.joinChatRoom(message);
+        break;
+      case "offer":
+        await this.handleOffer(message);
+        break;
+      case "answer":
+        await this.handleAnswer(message);
+        break;
+      case "ice_candidate":
+        await this.handleIceCandidate(message);
+        break;
+      default:
+        break;
     }
+  }
 
-    sendSignal(memberIdentifiers : Set<string>, message : Message) {
-        console.log('Sending message on signaling server...', message);
-        this.wsService.sendMessages(memberIdentifiers, message)
-    }
+  handleClosedConnection(memberIdentifier: string) {
+    console.log("Conexão encerrada.");
+    // this.activeRooms.delete(memberIdentifier);
+  }
 
+  getTargetMembers(memberIdentifier: string, targetRoom: string): Set<string> {
+    let targetMembers: Set<string> = new Set();
+    const roomMembers: Set<string> =
+      this.activeRooms.get(targetRoom) || new Set();
+    roomMembers.forEach(
+      (member) => memberIdentifier !== member && targetMembers.add(member)
+    );
+    return targetMembers;
+  }
 
-    async processSignalization(message : ReceivedMessage) {
-        console.log('Incoming message on signaling server...', message);
-        switch (message.type) {
-            case 'join':
-                await this.joinChatRoom(message)
-                break
-            case 'offer':
-                await this.handleOffer(message);
-                break;
-            case 'answer':
-                await this.handleAnswer(message);
-                break;
-            case 'ice_candidate':
-                await this.handleCandidate();
-                break;
-            default:
-                break;
-        }
-    }
+  async callRoomMembers(message: ReceivedMessage) {
+    const memberIdentifier = message.identifier;
+    const targetRoom = message.target;
 
-    handleClosedConnection(memberIdentifier : string) {
-        console.log('Conexão encerrada.');
-        // this.activeRooms.delete(memberIdentifier);
-    }
+    const targetMembers = this.getTargetMembers(memberIdentifier, targetRoom);
 
-    getTargetMembers(memberIdentifier:string, targetRoom: string) : Set<string>{
-        let targetMembers : Set<string> = new Set()
-        const roomMembers : Set<string> = this.activeRooms.get(targetRoom) || new Set();
-        roomMembers.forEach(member => memberIdentifier !== member && targetMembers.add(member))
-        return targetMembers
-    }
+    const callMessage: Message = {
+      data: "hi there",
+      type: "join",
+    };
+    console.log(`member ${memberIdentifier} calling: `, targetMembers);
+    this.sendMessage(targetMembers, callMessage);
+  }
 
-    async callRoomMembers(message : ReceivedMessage){
-        const memberIdentifier = message.identifier
-        const targetRoom = message.target
+  async joinChatRoom(message: ReceivedMessage) {
+    const memberIdentifier = message.identifier;
+    const targetRoom = message.target;
 
-        const targetMembers = this.getTargetMembers(memberIdentifier, targetRoom)
-        
-        const callMessage : Message = {
-            data: 'hi there',
-            type: 'call'
-        }
-        console.log(`member ${memberIdentifier} calling: `, targetMembers)
-        this.sendSignal(targetMembers, callMessage)
+    let roomMembers: Set<string> =
+      this.activeRooms.get(targetRoom) || new Set();
+    roomMembers.add(memberIdentifier);
+    this.activeRooms.set(targetRoom, roomMembers);
 
-    }
+    console.log(
+      `member ${memberIdentifier} joining rom ${targetRoom} with current members: `,
+      roomMembers
+    );
+    console.log("current active roms: ", this.activeRooms);
+    await this.callRoomMembers(message);
+  }
 
-    async joinChatRoom(message: ReceivedMessage){
-        const memberIdentifier = message.identifier
-        const targetRoom = message.target
+  broadcastOffers(memberIdentifiers: Set<string>) {
+    const offerBroadcastMessage: Message = {
+      data: "do you accept?",
+      type: "offer",
+    };
+    this.sendMessage(memberIdentifiers, offerBroadcastMessage);
+  }
 
-        let roomMembers : Set<string> = this.activeRooms.get(targetRoom) || new Set();
-        roomMembers.add(memberIdentifier)
-        this.activeRooms.set(targetRoom, roomMembers)
+  broadcastAnswers(memberIdentifiers: Set<string>) {
+    const answerBroadcastMessage: Message = {
+      data: "I accept",
+      type: "answer",
+    };
+    this.sendMessage(memberIdentifiers, answerBroadcastMessage);
+  }
 
-        console.log(`member ${memberIdentifier} joining rom ${targetRoom} with current members: `, roomMembers)
-        console.log('current active roms: ', this.activeRooms)
-        await this.callRoomMembers(message)
-    }
-    
-    broadcastOffers(memberIdentifiers: Set<string>){
-        const offerBroadcastMessage : Message = {
-            data: 'do you accept?',
-            type: 'offer'
-        }
-        this.sendSignal(memberIdentifiers, offerBroadcastMessage)
-    }
+  broadcastIceCandidate(memberIdentifiers: Set<string>) {
+    const answerBroadcastMessage: Message = {
+      data: "iceee",
+      type: "ice_candidate",
+    };
+    this.sendMessage(memberIdentifiers, answerBroadcastMessage);
+  }
 
-    async handleOffer(message : ReceivedMessage) {
-        console.log('Offer received', message)
-        const memberIdentifier = message.identifier
-        const targetRoom = message.target
-        const targetMembers = this.getTargetMembers(memberIdentifier, targetRoom);
-        this.broadcastOffers(targetMembers)
-    }
+  async handleOffer(offerMessage: ReceivedMessage) {
+    console.log("Offer received", offerMessage);
+    const memberIdentifier = offerMessage.identifier;
+    const targetRoom = offerMessage.target;
+    const targetMembers = this.getTargetMembers(memberIdentifier, targetRoom);
+    this.broadcastOffers(targetMembers);
+  }
 
-    async handleAnswer(answer: ReceivedMessage) {}
+  async handleAnswer(answerMessage: ReceivedMessage) {
+    console.log("answer received", answerMessage);
 
-    async handleCandidate() {}
+    const memberIdentifier = answerMessage.identifier;
+    const targetRoom = answerMessage.target;
+    const targetMembers = this.getTargetMembers(memberIdentifier, targetRoom);
+    this.broadcastAnswers(targetMembers);
+  }
 
-    handleConnection() {
-        this.wsService.on('message-received', (message: ReceivedMessage) => this.processSignalization(message));
-        this.wsService.on('connection-closed', (memberIdentifier) => this.handleClosedConnection(memberIdentifier));
-    }
+  async handleIceCandidate(iceCandidateMessage: ReceivedMessage) {
+    console.log("ice candidate received", iceCandidateMessage);
+    const memberIdentifier = iceCandidateMessage.identifier;
+    const targetRoom = iceCandidateMessage.target;
+    const targetMembers = this.getTargetMembers(memberIdentifier, targetRoom);
+    this.broadcastIceCandidate(targetMembers);
+  }
+
+  handleConnection() {
+    this.wsService.on("message-received", (message: ReceivedMessage) =>
+      this.processSignalization(message)
+    );
+    this.wsService.on("connection-closed", (memberIdentifier) =>
+      this.handleClosedConnection(memberIdentifier)
+    );
+  }
 }
 
 export default SignalingServer;
